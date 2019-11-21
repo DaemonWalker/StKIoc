@@ -22,19 +22,12 @@ namespace StKIoc.Internal
             this.ServiceProvider = new ServiceProvider();
         }
 
-        /// <summary>
-        /// from IDisposable
-        /// </summary>
         public void Dispose()
         {
             this.Dispose(true);
             GC.SuppressFinalize(this);
         }
 
-        /// <summary>
-        /// call by IDisposable
-        /// </summary>
-        /// <param name="disposing"></param>
         protected virtual void Dispose(bool disposing)
         {
             if (disposed == false)
