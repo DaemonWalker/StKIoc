@@ -22,7 +22,6 @@ namespace StKIoc.WebApiTest.Controllers
         public WeatherForecastController(ILogger<WeatherForecastController> logger)
         {
             _logger = logger;
-            this.foo = foo;
         }
 
         [HttpGet]
