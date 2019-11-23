@@ -7,20 +7,17 @@ namespace StKIoc.Internal
 {
     internal class ServiceScope : IServiceScope, IDisposable
     {
-        /// <summary>
-        /// for dispose
-        /// </summary>
-        private bool disposed = false;
-
-        /// <summary>
-        /// from IServiceScope
-        /// </summary>
-        public IServiceProvider ServiceProvider { get; }
-
         public ServiceScope()
         {
+            //给当前域创建一个ServiceProvider
             this.ServiceProvider = new ServiceProvider();
         }
+        #region IServiceScope
+        public IServiceProvider ServiceProvider { get; }
+        #endregion
+        #region IDisposable
+        private bool disposed = false;
+
 
         public void Dispose()
         {
@@ -39,10 +36,13 @@ namespace StKIoc.Internal
                 }
             }
         }
-
         ~ServiceScope()
         {
             this.Dispose(false);
         }
+        #endregion
+
+
+
     }
 }

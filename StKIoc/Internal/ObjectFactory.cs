@@ -1,60 +1,74 @@
-﻿using StKIoc.Exceptions;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 
 namespace StKIoc.Internal
 {
+    /// <summary>
+    /// 对象生成工厂
+    /// </summary>
     class ObjectFactory
     {
+        /// <summary>
+        /// 用于Factory生成对象
+        /// </summary>
         private IServiceProvider serviceProvider;
+        /// <summary>
+        /// 对应关系集合
+        /// </summary>
         private TypeRelationCollection typeRelations;
+        /// <summary>
+        /// 构造函数
+        /// </summary>
+        /// <param name="serviceProvider"></param>
         public ObjectFactory(IServiceProvider serviceProvider)
         {
             this.typeRelations = TypeRelationCollection.Instance;
             this.serviceProvider = serviceProvider;
         }
+        /// <summary>
+        /// 根据对应关系获取实体
+        /// </summary>
+        /// <param name="relation"></param>
+        /// <returns></returns>
         public object Get(TypeRelation relation)
         {
+            //如果注册时提供了对象则直接适用对象
             if (relation.Instance != null)
             {
                 return relation.Instance;
             }
+            //如果注册时提供了Func<ISeriveProvider,object>用于生成对象则调用Func
             else if (relation.Factory != null)
             {
                 return relation.Factory.Invoke(this.serviceProvider);
+
             }
-            else
+            //如果在对应关系中存在serviceType则根据构造函数生成对象
+            else if (this.typeRelations.ContainsServiceType(relation.ServiceType))
             {
-                return this.Get(relation.ServiceType, relation.ImplementType);
+                return CreateByConstructor(relation.ImplementType);
             }
-        }
-        private object Get(Type serviceType, Type implementType)
-        {
-            if (this.typeRelations.ContainsServiceType(serviceType))
+            //检查泛型情况
+            else if (relation.ServiceType.IsConstructedGenericType)
             {
-                return CreateByConstructor(implementType);
-            }
-            else if (serviceType.IsConstructedGenericType)
-            {
-                if (serviceType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                if (relation.ServiceType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
                 {
-                    return CreateIEnumerable(serviceType);
+                    return CreateIEnumerable(relation.ServiceType);
                 }
                 else
                 {
-                    return CreateGeneric(serviceType);
+                    return CreateGeneric(relation.ServiceType);
                 }
             }
+            //暂时没想到这种情况，先扔个异常
             else
             {
-                throw new NotImplementedException();
+                return null;
             }
-
         }
 
         /// <summary>
@@ -68,35 +82,30 @@ namespace StKIoc.Internal
 
             //使用能找到最多参数的构造函数进行实例化
             var constructors = implementType.GetConstructors().Where(p => p.IsPublic).OrderByDescending(p => p.GetParameters().Length).ToArray();
-            var parms = new List<object>();
+            object[] parms = null;
             foreach (var constructor in constructors)
             {
                 var fit = true;
-                parms.Clear();
                 foreach (var parm in constructor.GetParameters())
                 {
-                    var obj = this.serviceProvider.GetService(parm.ParameterType);
-                    if (obj == null)
+                    if (this.serviceProvider.GetService<ObjectMap>().CanCreateInstance(parm.ParameterType) == false)
                     {
                         fit = false;
                         break;
-                    }
-                    else
-                    {
-                        parms.Add(obj);
                     }
                 }
                 if (fit)
                 {
                     bestConstructor = constructor;
+                    parms = bestConstructor.GetParameters().Select(p => this.serviceProvider.GetService(p.ParameterType)).ToArray();
                     break;
                 }
             }
             if (bestConstructor == null)
             {
-                throw new NoFitConstructorException(implementType);
+               Utils.ThrowNoFitConstructorException(implementType);
             }
-            return bestConstructor.Invoke(parms.ToArray());
+            return bestConstructor.Invoke(parms);
         }
 
         /// <summary>
@@ -127,7 +136,7 @@ namespace StKIoc.Internal
             //如果在ioc内能找到对应inType
             if (newServiceType != null)
             {
-                var relations = this.typeRelations.GetGetRelations(newServiceType, parms);
+                var relations = this.typeRelations.GetRelations(newServiceType, parms);
                 foreach (var relation in relations)
                 {
                     list.Add(this.serviceProvider.GetServiceByRelation(relation));

@@ -17,10 +17,12 @@ namespace StKIoc.WebApiTest.Controllers
         };
 
         private readonly ILogger<WeatherForecastController> _logger;
+        private readonly IFoo foo;
 
         public WeatherForecastController(ILogger<WeatherForecastController> logger)
         {
             _logger = logger;
+            this.foo = foo;
         }
 
         [HttpGet]
